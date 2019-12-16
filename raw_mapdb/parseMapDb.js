@@ -2,23 +2,64 @@ var fs = require('fs');
 const readline = require('readline');
 const lineReader = require('line-reader');
 
-function readLines() {
-    let fullData = './rawGS4map.dat';
-    let testData = './truncatedMapDb.dat';
-    let counter = 0;
+const writeStream = fs.createWriteStream('file.txt');
+const pathName = writeStream.path;
 
+function readLines() {
+    let fullData = './rawGS4map.dat'
+    let testData = './truncatedMapDb.dat'
+    
+    let counter = 0;
     function updateCount() {
         counter++;
     }
 
-        lineReader.eachLine(testData, function(line) {
-            getLocationMapData(line);
-            getMainDescription(line, updateCount);
-            //console.log(counter);
+    //Organized for refactor in class objects to build graph
+    let locObjModel = new Map()
+    locObjModel.set('navOptions', undefined)
+    locObjModel.set('mainDesc', undefined)
+    locObjModel.set('locDesc', undefined)
+
+
+        lineReader.eachLine(fullData, function(line) {
+
+            //refactor below when build new model
             getNavigationOptions(line);
+            getMainDescription(line);
+            getLocationMapData(line);
             
+            if(getNavigationOptions(line)) {
+                locObjModel.navOptions = getNavigationOptions(line);
+            }
+            if(getMainDescription(line)) {
+                locObjModel.mainDesc = getMainDescription(line);
+            }
+            if(getLocationMapData(line)) {
+                locObjModel.locDesc = getLocationMapData(line);
+            }
+
+            //checking if we have built a full model
+            //can refactor this away
+            tempArray = Object.values(locObjModel)
+
+            if(!tempArray.includes(undefined) && tempArray.length == 3) {
+                // get model training and front end mvp then come back and make a fancy graph w/ new models
+
+                console.log(counter)
+                updateCount();
+                // writeStream.write(locObjModel.locDesc + '\n' + locObjModel.mainDesc + '\n' + locObjModel.navOptions + '\n')
+                writeStream.write('\n' + locObjModel.mainDesc + '\n' + '<|endoftext|>' + '\n')
+                // console.log(locObjModel.locDesc)
+                // console.log(locObjModel.mainDesc)
+                // console.log(locObjModel.navOptions)
+                locObjModel.navOptions = undefined
+                locObjModel.mainDesc = undefined
+                locObjModel.locDesc = undefined
+            }
     })
 }
+
+
 
 function getNavigationOptions(line) {
     if(line.includes('Obvious ')) {
@@ -26,7 +67,8 @@ function getNavigationOptions(line) {
         let initialProcess = line.substring(firstWordIndex);
         let finalIndex = initialProcess.indexOf(';')
         let processed = initialProcess.substring(0, finalIndex)
-        console.log('[' + processed + ']');
+
+        return ('[' + processed.toString() + ']' + '\n' + '<|endoftext|>' + '\n');
     }
 }
 
@@ -38,22 +80,20 @@ function getLocationMapData(line) {
         regexResult = regexResult.toString()
         let trimmed = regexResult.substring(0, regexResult.indexOf(']'));
 
-        console.log(trimmed + ']');
+        return (trimmed.toString() + ']');
         }
     }
 
 }
 
-function getMainDescription(line, updateCount) {
+function getMainDescription(line) {
     
-    //your main shortcut here is line length but many descriptions are gonna be under 500
-    if(line.length > 200 && !line.includes('jpg')) { //you and jpg to avoid non-description lines
+    if(line.length > 100 && !line.includes('jpg')) {
         var pattern = /[\w+]+(?:'[a-z\d]+)*|(?<![!?.])[!?.]/g;
         var regexResult = line.toString();
-        regexResult = line.match(pattern); //can you grab line+1 to get the [East Florywn] identifier
+        regexResult = line.match(pattern);
         var myString = '';
         var placeholder = '';
-        updateCount();
 
         for(var i = 0; i < regexResult.length; i++) {
             myString = placeholder;
@@ -65,11 +105,10 @@ function getMainDescription(line, updateCount) {
                 placeholder = myString.concat(regexResult[i].toString() + ' ');
             } 
         }
-
-        console.log(myString);
-        // console.log('\n')
-        console.log('<|endoftext|>')
-        console.log('\n')
+        //some bad data with sentences here following i*i pattern or starting with lowercase a
+        if (!myString.match(/[0-9]/g)) {
+        return (myString.toString());
+        };
     }
 }
 
